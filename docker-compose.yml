@@ -1,0 +1,63 @@
+version: '3'
+services:
+  zoneh-node1:
+    image: amazon/opendistro-for-elasticsearch:0.9.0
+    container_name: zoneh-node1-container
+    environment:
+      - cluster.name=zone-h-cluster
+      - bootstrap.memory_lock=true # along with the memlock settings below, disables swapping
+      - "ES_JAVA_OPTS=-Xms4096m -Xmx4096m" # minimum and maximum Java heap size, recommend setting both to 50% of system RAM
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - zoneh-data1:/usr/share/elasticsearch/data
+    ports:
+      - 9200:9200
+      - 9600:9600 # required for Performance Analyzer
+    networks:
+      - zoneh-cluster-net
+
+  zoneh-node2:
+    image: amazon/opendistro-for-elasticsearch:0.9.0
+    container_name: zoneh-node2-container
+    environment:
+      - cluster.name=zone-h-cluster
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - discovery.zen.ping.unicast.hosts=zoneh-node1
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - zoneh-data2:/usr/share/elasticsearch/data
+    networks:
+      - zoneh-cluster-net
+
+
+
+
+  kibana:
+    image: amazon/opendistro-for-elasticsearch-kibana:0.9.0
+    container_name: zoneh-kibana
+    ports:
+      - 5601:5601
+    expose:
+      - "5601"
+    environment:
+      ELASTICSEARCH_URL: https://zoneh-node1:9200
+      ELASTICSEARCH_HOSTS: https://zoneh-node1:9200
+    networks:
+      - zoneh-cluster-net
+
+
+
+
+volumes:
+  zoneh-data1:
+  zoneh-data2:
+
+networks:
+  zoneh-cluster-net:
