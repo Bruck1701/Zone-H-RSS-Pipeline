@@ -14,6 +14,7 @@ import "context"
 import ("net/http"; "crypto/tls")
 import "hash/fnv"
 import "strconv"
+import "bufio"
 
 
 
@@ -183,6 +184,19 @@ func ETL(in <- chan []byte) <-chan []byte{
           }
           PointLocation=Location{res.Longitude,res.Latitude}
         }
+        filename:= strconv.FormatUint(hash(m.Date+m.Site+m.Author),10)
+        f, err := os.Create("tmp/"+filename)
+        w := bufio.NewWriter(f)
+        command := fmt.Sprintf("start %s -m sfp_dns,sfp_fraudguard,sfp_malwarepatrol,sfp_censys,sfp_ipinfo,sfp_shodan,sfp_dronebl,sfp_honeypot,sfp_alienvault,sfp_duckduckgo,sfp_whois,sfp_virustotal,sfp_intelx,sfp_watchguard,sfp_abuseipdb,sfp_ripe,sfp_email -n %s -w\n",m.IP,m.Site)
+        n4, err := w.WriteString(command)
+
+        if err != nil{
+          fmt.Println("File error:",err)
+        }
+        fmt.Println("Wrote: ",n4, "bytes")
+        w.Flush()
+
+
       }
 
 
@@ -192,7 +206,6 @@ func ETL(in <- chan []byte) <-chan []byte{
       PointLocation=Location{181,91}
       ContinentName="N/A"
       CountryName="N/A"
-
 
       out <- jsonStr
     }
@@ -206,6 +219,7 @@ return out
 func output(in <- chan []byte){
 
   var tmp DeventPlus
+
 
   tr := &http.Transport{
   TLSClientConfig: &tls.Config{InsecureSkipVerify : true},
@@ -265,41 +279,25 @@ func output(in <- chan []byte){
   }
   //bulkRequest := client.Bulk()
 
-  for elem:= range in {
-    json.Unmarshal(elem,&tmp)
-    id:= hash(tmp.Date+tmp.Site+tmp.Author)
-    //req:= elastic.NewBulkIndexRequest().Index(indexName).Type(docType).Id(strconv.FormatUint(id,10)).Doc(elem)
-    //bulkRequest = bulkRequest.Add(req)
 
 
+    for elem:= range in {
+      json.Unmarshal(elem,&tmp)
+      id:= hash(tmp.Date+tmp.Site+tmp.Author)
 
-    result,err :=client.Index().Index(indexName).Type(docType).Id(strconv.FormatUint(id,10)).BodyJson(tmp).Do(context.Background())
-    fmt.Println(result)
-    fmt.Println(err)
+      result,err :=client.Index().Index(indexName).Type(docType).Id(strconv.FormatUint(id,10)).BodyJson(tmp).Do(context.Background())
+      fmt.Println(result)
+      fmt.Println(err)
 
-    fmt.Println("id: ",id)
-    fmt.Println(tmp)
-    fmt.Println()
+      fmt.Println("id: ",id)
+      fmt.Println(tmp)
+      fmt.Println()
+    }
 
-  }
-
-
-
-  //bulkResponse, err := bulkRequest.Do(context.Background())
-  //if err != nil {
-	//		fmt.Println(err)
-  //}
-
-  _, err = client.Flush().Index(indexName).Do(context.Background())
-	if err != nil {
-		panic(err)
-	}
-
-
-  //if bulkResponse != nil {
-  //  fmt.Println("BulResponse: ",bulkResponse)
-  //}
-
+    _, err = client.Flush().Index(indexName).Do(context.Background())
+  	if err != nil {
+  		panic(err)
+  	}
 
 
 }
@@ -307,22 +305,13 @@ func output(in <- chan []byte){
 
 
 
+
 func main(){
 
-  //ar tmp DeventPlus
 
   out1:=getData()
-  //fmt.Println(<-out1)
   out2:=ETL(out1)
-
   output(out2)
-
-  //for elem := range out2 {
-      //fmt.Println(elem)
-  //    json.Unmarshal(elem,&tmp)
-  //    fmt.Println(tmp)
-  //    fmt.Println()
-  //  }
 
 
 }
